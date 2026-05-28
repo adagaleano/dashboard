@@ -3,11 +3,59 @@
 //  Equivalente a load_data_from_gsheet() y get_available_year_sheets() de app.R
 // =========================
 
-async function fetchSheet(accessToken, spreadsheetId, sheetName) {
-  const rango = `${sheetName}!A1:Z5000`;
-  const url   = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(rango)}`;
+function hasGoogleApiKey() {
+  return typeof GOOGLE_API_KEY !== 'undefined' && GOOGLE_API_KEY;
+}
 
-  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+function googleSheetsFetchOptions(accessToken) {
+  return accessToken ? { headers: { 'Authorization': `Bearer ${accessToken}` } } : {};
+}
+
+function withGoogleApiKey(url) {
+  if (!hasGoogleApiKey()) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}key=${encodeURIComponent(GOOGLE_API_KEY)}`;
+}
+
+function canUseSheetsApi(accessToken) {
+  return !!accessToken || hasGoogleApiKey();
+}
+
+function parseGvizRows(text) {
+  const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+  const data = JSON.parse(jsonText);
+  const cols = data.table?.cols || [];
+  const rows = data.table?.rows || [];
+  const headers = cols.map((col, idx) => col.label || `col_${idx + 1}`);
+
+  return rows
+    .map(row => {
+      const obj = {};
+      headers.forEach((header, idx) => {
+        const cell = row.c?.[idx];
+        obj[header] = cell?.v ?? '';
+      });
+      return obj;
+    })
+    .filter(row => Object.values(row).some(v => String(v).trim() !== ''));
+}
+
+async function fetchPublicSheet(spreadsheetId, sheetName) {
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Error leyendo hoja publica "${sheetName}": ${res.statusText}`);
+  return parseGvizRows(await res.text());
+}
+
+async function fetchSheet(accessToken, spreadsheetId, sheetName) {
+  if (!canUseSheetsApi(accessToken)) {
+    return fetchPublicSheet(spreadsheetId, sheetName);
+  }
+
+  const rango = `${sheetName}!A1:Z5000`;
+  const url   = withGoogleApiKey(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(rango)}`);
+
+  const res = await fetch(url, googleSheetsFetchOptions(accessToken));
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`Error leyendo "${sheetName}": ${err.error?.message || res.statusText}`);
@@ -33,9 +81,20 @@ async function fetchSheet(accessToken, spreadsheetId, sheetName) {
 
 // Equivalente a get_available_year_sheets(): detecta hojas pa01_XXXX disponibles
 async function getAvailableYears(accessToken, spreadsheetId) {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`;
-  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-  if (!res.ok) throw new Error('No se pudo obtener metadata del spreadsheet');
+  if (!canUseSheetsApi(accessToken)) {
+    const years = Array.isArray(window.DASHBOARD_PUBLIC_YEARS) ? window.DASHBOARD_PUBLIC_YEARS : [];
+    return years
+      .filter(y => /^20\d{2}$/.test(String(y)))
+      .sort((a, b) => a - b)
+      .map(y => ({ sheet: `pa01_${y}`, year: Number(y) }));
+  }
+
+  const url = withGoogleApiKey(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`);
+  const res = await fetch(url, googleSheetsFetchOptions(accessToken));
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`No se pudo obtener metadata del spreadsheet: ${err.error?.message || res.statusText}`);
+  }
 
   const data   = await res.json();
   const sheets = data.sheets || [];

@@ -1,7 +1,10 @@
-// Copia este archivo como config.js y completa los valores reales.
+// Para GitHub Pages usa config.public.js con GOOGLE_API_KEY.
+// Para trabajo local con service account, copia este archivo como config.js.
 const SPREADSHEET_ID = 'TU_SPREADSHEET_ID';
 const DASHBOARD_SPREADSHEET_ID = 'TU_DASHBOARD_SPREADSHEET_ID';
+const GOOGLE_API_KEY = 'TU_API_KEY_PUBLICA_RESTRINGIDA';
 
+// Opcional solo para uso local. No publiques esta llave privada en GitHub.
 const SERVICE_ACCOUNT_KEY = {
   type: 'service_account',
   project_id: 'TU_PROJECT_ID',
