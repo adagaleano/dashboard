@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+server.py
+.claude/
+
+# Credenciales locales
+config.js
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db

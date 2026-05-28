@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard SAR – Recaudación</title>
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- jQuery (requerido por DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <!-- DataTables -->
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <!-- SheetJS para Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="auth-locked">
+
+<!-- =====================================================================
+     LOGIN
+     ===================================================================== -->
+<section id="login-screen" class="login-screen">
+  <form id="login-form" class="login-panel">
+    <div class="login-brand">
+      <img src="img/logo.png" alt="SAR">
+      <div>
+        <h1>Dashboard SAR</h1>
+        <p>Acceso interno</p>
+      </div>
+    </div>
+
+    <div class="login-field">
+      <label for="login-user">Usuario</label>
+      <input id="login-user" type="text" autocomplete="username" required>
+    </div>
+
+    <div class="login-field">
+      <label for="login-password">Contraseña</label>
+      <input id="login-password" type="password" autocomplete="current-password" required>
+    </div>
+
+    <div id="login-error" class="login-error" style="display:none;"></div>
+    <button type="submit" class="login-submit">Ingresar</button>
+  </form>
+</section>
+
+<!-- =====================================================================
+     LOADING OVERLAY
+     ===================================================================== -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <p id="loading-msg">Iniciando…</p>
+</div>
+
+<!-- =====================================================================
+     NAVBAR
+     ===================================================================== -->
+<nav class="navbar">
+  <div class="nav-logo">
+    <img src="img/logo.png" alt="SAR">
+  </div>
+
+  <button class="hamburger-btn" onclick="document.querySelector('.nav-links').classList.toggle('nav-open')">
+    <span></span><span></span><span></span>
+  </button>
+
+  <div class="nav-links">
+    <button class="nav-btn active" id="btn-dashboard"
+            onclick="switchTab('dashboard'); document.querySelector('.nav-links').classList.remove('nav-open')">
+      Ver Por Concepto Impuesto
+    </button>
+    <button class="nav-btn" id="btn-pagina2"
+            onclick="switchTab('pagina2'); document.querySelector('.nav-links').classList.remove('nav-open')">
+      Anexo Por Cuenta PA01
+    </button>
+    <button class="nav-btn" id="btn-segmentacion"
+            onclick="switchTab('segmentacion'); document.querySelector('.nav-links').classList.remove('nav-open')">
+      Ver por Segmentación
+    </button>
+
+    <div class="year-controls">
+      <select id="year-select" onchange="onYearChange()"></select>
+      <button class="btn-refresh" onclick="onRefresh()" title="Limpiar caché y recargar">↺ Actualizar</button>
+      <button class="btn-logout" onclick="onLogout()" title="Cerrar sesión">Salir</button>
+    </div>
+  </div>
+</nav>
+
+<!-- =====================================================================
+     ERROR
+     ===================================================================== -->
+<div id="error-msg" style="display:none;background:#fde8e8;color:#b71c1c;padding:16px 24px;margin:16px;border-radius:8px;font-weight:600;"></div>
+
+<!-- =====================================================================
+     TAB: DASHBOARD
+     ===================================================================== -->
+<div id="tab-dashboard" class="tab-content active">
+  <div class="dashboard-container">
+
+    <!-- KPI Cards -->
+    <div class="dashboard-stats">
+      <div class="value-box" id="kpi-cumplimiento-anual">
+        <div class="kpi-icon">📈</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-label">Cumplimiento de Meta Anual</div>
+      </div>
+      <div class="value-box" id="kpi-cumplimiento-mes">
+        <div class="kpi-icon">📅</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-label">Cumplimiento Último Mes</div>
+      </div>
+      <div class="value-box" id="kpi-total-recaudado">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-label">Total Recaudado (Mill. Lempiras)</div>
+      </div>
+      <div class="value-box" id="kpi-total-meta">
+        <div class="kpi-icon">🎯</div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-label">Total Meta (Mill. Lempiras)</div>
+      </div>
+    </div>
+
+    <!-- Gráficos y velocímetro -->
+    <div class="dashboard-content">
+
+      <!-- Histograma -->
+      <div class="card">
+        <div id="chart-histograma" class="chart-container"></div>
+      </div>
+
+      <!-- Pastel -->
+      <div class="card">
+        <div id="chart-pastel" class="chart-container"></div>
+      </div>
+
+      <!-- Velocímetro + Tabla Variaciones -->
+      <div class="card card-full">
+        <div style="display:flex;flex-direction:column;gap:18px;">
+
+          <!-- Velocímetro -->
+          <div>
+            <div id="chart-velocimetro" class="chart-wide"></div>
+          </div>
+
+          <!-- Tabla Variaciones -->
+          <div>
+            <div class="variaciones-controls">
+              <div id="control-mes-corte" style="display:none">
+                <label>Hasta:</label>
+                <select id="sel-mes-corte" onchange="onMesCorteChange()"></select>
+              </div>
+              <div id="control-mes-mensual" style="display:none">
+                <label>Mes:</label>
+                <select id="sel-mes-mensual" onchange="onMesMensualChange()"></select>
+              </div>
+              <div>
+                <label>Periodo:</label>
+                <select id="sel-modo-variacion" onchange="onModoChange()">
+                  <option value="anual">Anual</option>
+                  <option value="acumulado">Acumulado</option>
+                  <option value="mensual">Mensual</option>
+                </select>
+              </div>
+            </div>
+            <div id="container-tabla-variaciones"></div>
+            <button class="btn-excel" onclick="exportarVariacionesExcel(AppState.dataActual, AppState.dataPrev, AppState.anioActual, AppState.modo, AppState.mesCorte, AppState.mesMensual)">
+              📥 Descargar (Excel)
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Tabla Mensual -->
+      <div class="card card-full">
+        <div id="container-tabla-impuestos"></div>
+        <button class="btn-excel" onclick="exportarTablaImpuestosExcel(AppState.dataActual, AppState.anioActual)">
+          📥 Descargar tabla (Excel)
+        </button>
+      </div>
+
+      <!-- Tabla Acumulado -->
+      <div class="card card-full">
+        <h3>📈 Acumulado Observado vs Meta</h3>
+        <div id="container-tabla-acumulado"></div>
+        <button class="btn-excel" onclick="exportarTablaAcumuladoExcel(AppState.dataActual, AppState.anioActual)">
+          📥 Descargar acumulado (Excel)
+        </button>
+      </div>
+
+    </div><!-- /dashboard-content -->
+  </div><!-- /dashboard-container -->
+</div><!-- /tab-dashboard -->
+
+<!-- =====================================================================
+     TAB: PÁGINA 2 – ANEXO PA01
+     ===================================================================== -->
+<div id="tab-pagina2" class="tab-content">
+  <div class="pagina2-container">
+    <h2>📄 Anexo Por Subcuenta PA01</h2>
+    <p>Descarga los datos filtrados por mes o el archivo completo.</p>
+
+    <div class="download-section">
+      <div>
+        <label for="sel-mes-pagina2">Selecciona un Mes:</label>
+        <select id="sel-mes-pagina2">
+          <option value="">— Todos —</option>
+          <option>Enero</option><option>Febrero</option><option>Marzo</option>
+          <option>Abril</option><option>Mayo</option><option>Junio</option>
+          <option>Julio</option><option>Agosto</option><option>Septiembre</option>
+          <option>Octubre</option><option>Noviembre</option><option>Diciembre</option>
+        </select>
+      </div>
+      <button class="btn-excel" onclick="exportarPagina2Excel(AppState.dataActual, document.getElementById('sel-mes-pagina2').value || null, AppState.anioActual)">
+        📥 Descargar Datos del Mes
+      </button>
+      <button class="btn-secondary-dl" onclick="exportarPagina2Excel(AppState.dataActual, null, AppState.anioActual)">
+        📂 Descargar Todo el Archivo
+      </button>
+    </div>
+
+    <div class="card">
+      <div id="container-tabla-pagina2">
+        <p style="color:#888">Selecciona "Anexo Por Cuenta PA01" para cargar la tabla.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================================
+     TAB: SEGMENTACIÓN — Domicilio Fiscal por Departamento
+     ===================================================================== -->
+<div id="tab-segmentacion" class="tab-content">
+  <div class="seg-container">
+
+    <!-- Controls -->
+    <div class="card seg-controls">
+      <div>
+        <label>Mes:</label>
+        <select id="sel-mes-seg" onchange="onMesSegChange()">
+          <option value="">Todos los meses</option>
+        </select>
+      </div>
+      <div class="viz-toggle">
+        <span style="font-size:12px;color:#6b7280;margin-right:4px;">Vista:</span>
+        <button id="btn-seg-recaudacion" class="viz-btn viz-btn-active" onclick="onModeSegChange('recaudacion')">Recaudación</button>
+        <button id="btn-seg-variacion"   class="viz-btn"               onclick="onModeSegChange('variacion')">Var. nominal</button>
+        <button id="btn-seg-var_real"    class="viz-btn"               onclick="onModeSegChange('var_real')">Var. real</button>
+      </div>
+    </div>
+
+    <!-- Mapa coroplético -->
+    <div class="card">
+      <div class="df-panel-header" id="seg-map-title">Mapa por Departamento</div>
+      <div id="mapa-departamentos" style="height:440px;border-radius:6px;"></div>
+    </div>
+
+    <!-- Ranking -->
+    <div class="card">
+      <div class="df-panel-header" id="seg-ranking-title">Ranking Departamentos</div>
+      <div id="ranking-pagination"
+           style="display:none;align-items:center;justify-content:center;gap:14px;padding:4px 0 10px;">
+        <button class="btn-nav" id="btn-ranking-prev" onclick="onRankingPrev()">← Anterior</button>
+        <span   id="ranking-info" style="font-size:11px;color:#6b7280;min-width:160px;text-align:center;"></span>
+        <button class="btn-nav" id="btn-ranking-next" onclick="onRankingNext()">Siguiente →</button>
+      </div>
+      <div id="ranking-cards"></div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card">
+      <div id="container-tabla-seg"></div>
+      <button class="btn-excel" onclick="exportarSegExcel()">📥 Descargar (Excel)</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- =====================================================================
+     SCRIPTS (orden importa: config → auth → loaders → modules → app)
+     ===================================================================== -->
+<!-- GeoJSON e IPC embebidos — permite abrir con file:// sin servidor HTTP -->
+<script src="js/hn_geojson.js"></script>
+<script src="js/ipc_bch.js"></script>
+<script src="js/app_users.js"></script>
+<script src="js/login.js"></script>
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="loader-dashboard.js"></script>
+<script src="js/data.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/tables.js"></script>
+<script src="js/segmentacion.js"></script>
+<script src="js/mapa.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
