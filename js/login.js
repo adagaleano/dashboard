@@ -13,6 +13,13 @@ function getAppUsers() {
   ];
 }
 
+function cleanLoginValue(value, lower = false) {
+  let text = String(value || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+  return lower ? text.toLowerCase() : text;
+}
+
 function showLoginError(message) {
   const el = document.getElementById('login-error');
   if (!el) return;
@@ -40,11 +47,11 @@ function unlockDashboard(onSuccess) {
 function handleAppLogin(onSuccess) {
   clearLoginError();
 
-  const username = (document.getElementById('login-user')?.value || '').trim().toLowerCase();
-  const password = (document.getElementById('login-password')?.value || '').trim();
+  const username = cleanLoginValue(document.getElementById('login-user')?.value, true);
+  const password = cleanLoginValue(document.getElementById('login-password')?.value);
   const user = getAppUsers().find(u =>
-    String(u.username || '').trim().toLowerCase() === username &&
-    String(u.password || '').trim() === password
+    cleanLoginValue(u.username, true) === username &&
+    cleanLoginValue(u.password) === password
   );
 
   if (!user) {

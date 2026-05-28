@@ -40,12 +40,12 @@
 
     <div class="login-field">
       <label for="login-user">Usuario</label>
-      <input id="login-user" type="text" autocomplete="username" required>
+      <input id="login-user" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required>
     </div>
 
     <div class="login-field">
       <label for="login-password">Contraseña</label>
-      <input id="login-password" type="password" autocomplete="current-password" required>
+      <input id="login-password" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>
     </div>
 
     <div id="login-error" class="login-error" style="display:none;"></div>
@@ -292,8 +292,8 @@
 <!-- GeoJSON e IPC embebidos — permite abrir con file:// sin servidor HTTP -->
 <script src="js/hn_geojson.js"></script>
 <script src="js/ipc_bch.js"></script>
-<script src="js/app_users.js"></script>
-<script src="js/login.js"></script>
+<script src="js/app_users.js?v=3"></script>
+<script src="js/login.js?v=3"></script>
 <script src="config.js"></script>
 <script src="config.public.js"></script>
 <script src="auth.js"></script>
