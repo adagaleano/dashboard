@@ -1,7 +1,16 @@
 const LOGIN_SESSION_KEY = 'dashboard_sar_logged_in';
 
 function getAppUsers() {
-  return Array.isArray(window.APP_USERS) ? window.APP_USERS : (typeof APP_USERS !== 'undefined' ? APP_USERS : []);
+  const users = Array.isArray(window.APP_USERS) ? window.APP_USERS : [];
+  if (users.length) return users;
+
+  return [
+    {
+      username: 'sar',
+      password: 'sar2026',
+      name: 'Usuario SAR'
+    }
+  ];
 }
 
 function showLoginError(message) {
@@ -31,9 +40,12 @@ function unlockDashboard(onSuccess) {
 function handleAppLogin(onSuccess) {
   clearLoginError();
 
-  const username = document.getElementById('login-user')?.value.trim() || '';
-  const password = document.getElementById('login-password')?.value || '';
-  const user = getAppUsers().find(u => u.username === username && u.password === password);
+  const username = (document.getElementById('login-user')?.value || '').trim().toLowerCase();
+  const password = (document.getElementById('login-password')?.value || '').trim();
+  const user = getAppUsers().find(u =>
+    String(u.username || '').trim().toLowerCase() === username &&
+    String(u.password || '').trim() === password
+  );
 
   if (!user) {
     showLoginError('Usuario o contraseña incorrectos.');
