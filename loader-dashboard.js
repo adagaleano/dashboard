@@ -165,7 +165,17 @@ async function loadDepData(accessToken, spreadsheetId, sheetName) {
 
     const mesRaw = String(r.mes || '').trim();
     const mesInt = parseInt(mesRaw);
-    r.mes = (!isNaN(mesInt) && mesInt >= 1 && mesInt <= 12) ? mesInt : null;
+    if (!isNaN(mesInt) && mesInt >= 1 && mesInt <= 12) {
+      r.mes = mesInt;
+    } else {
+      // Aceptar también nombre de mes en español ("Enero", "enero", etc.)
+      const norm = mesRaw.toLowerCase()
+        .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
+        .replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u');
+      const mesNombres = { enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,
+                           julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12 };
+      r.mes = mesNombres[norm] || null;
+    }
 
     const ms = String(r.monto || '').trim();
     let monto;

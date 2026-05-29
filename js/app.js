@@ -295,30 +295,45 @@ function onMesMensualChange() {
 }
 
 // ── Segmentación: carga de datos por departamento ────────────────────────────
+// Posibles nombres de hoja para datos de departamento (se prueban en orden)
+const DEP_SHEET_PATTERNS = [
+  anio => `Departamento_${anio}`,
+  anio => `departamento_${anio}`,
+  anio => `Depto_${anio}`,
+  anio => `depto_${anio}`,
+  anio => `Dep_${anio}`
+];
+
+async function tryLoadDepSheet(anio) {
+  for (const pattern of DEP_SHEET_PATTERNS) {
+    const sheetName = pattern(anio);
+    try {
+      const data = await loadWithCache(
+        sheetName,
+        () => loadDepData(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, sheetName)
+      );
+      if (data && data.length > 0) {
+        console.log(`[Seg] Hoja encontrada: ${sheetName} (${data.length} filas)`);
+        return { data, sheetName };
+      }
+      console.log(`[Seg] ${sheetName}: sin datos`);
+    } catch (e) {
+      console.log(`[Seg] ${sheetName}: error – ${e.message}`);
+    }
+  }
+  return { data: null, sheetName: null };
+}
+
 async function cargarDepData() {
   if (!AppState.anioActual) return;
-  const anio      = AppState.anioActual;
-  const sheetAct  = `Departamento_${anio}`;
-  const sheetPrev = `Departamento_${anio - 1}`;
+  const anio = AppState.anioActual;
 
-  try {
-    AppState.depData = await loadWithCache(
-      sheetAct,
-      () => loadDepData(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, sheetAct)
-    );
-  } catch (e) {
-    console.warn(`No se pudo cargar ${sheetAct}:`, e.message || e);
-    AppState.depData = null;
-  }
+  const { data: act, sheetName: sAct } = await tryLoadDepSheet(anio);
+  AppState.depData      = act;
+  AppState.depSheetName = sAct;
 
-  try {
-    AppState.depPrev = await loadWithCache(
-      sheetPrev,
-      () => loadDepData(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, sheetPrev)
-    );
-  } catch {
-    AppState.depPrev = null;
-  }
+  const { data: prev } = await tryLoadDepSheet(anio - 1);
+  AppState.depPrev = prev;
 }
 
 // ── Poblar selector de mes para segmentación ──────────────────────────────────
@@ -354,8 +369,12 @@ async function renderSegmentacion() {
   }
 
   if (!AppState.depData) {
+    const intentados = DEP_SHEET_PATTERNS
+      .map(p => p(AppState.anioActual)).join(', ');
+    const msg = `No se encontraron datos de departamento. Hojas buscadas: ${intentados}`;
     const el = document.getElementById('ranking-cards');
-    if (el) el.innerHTML = '<p style="color:#888;padding:10px;">No hay datos de departamento disponibles.</p>';
+    if (el) el.innerHTML = `<p style="color:#b71c1c;padding:10px;">${msg}</p>`;
+    console.warn('[Seg]', msg);
     return;
   }
 
