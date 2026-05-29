@@ -26,5 +26,5 @@ if (typeof DASHBOARD_PUBLIC_YEARS === 'undefined') {
 //   5. Restringe la clave a: Sitios web HTTP → tu dominio de GitHub Pages (ej. https://usuario.github.io/*)
 //   6. Pega la clave abajo reemplazando el string vacío
 if (typeof GOOGLE_API_KEY === 'undefined') {
-  window.GOOGLE_API_KEY = '';  // ← pega aquí tu API key, ej: 'AIzaSy...'
+  window.GOOGLE_API_KEY = 'AIzaSyCM___dTT0paZeLvVmFGx_K_Sr3ytsDx0k';  // ← pega aquí tu API key, ej: 'AIzaSy...'
 }
