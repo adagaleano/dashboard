@@ -81,6 +81,13 @@ async function cargarAnio(sheetName, anio, fromRefresh = false) {
     actualizarUltimoMesControles();
     renderDashboard();
 
+  } catch (e) {
+    const errEl = document.getElementById('error-msg');
+    if (errEl) {
+      errEl.textContent = `Error cargando datos ${anio}: ${e.message}`;
+      errEl.style.display = 'block';
+    }
+    console.error('cargarAnio error:', e);
   } finally {
     hideLoading();
   }
