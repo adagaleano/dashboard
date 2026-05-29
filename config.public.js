@@ -1,11 +1,11 @@
 // Configuracion para GitHub Pages.
 // Usa una API key restringida por dominio y comparte el spreadsheet como lector.
 if (typeof SPREADSHEET_ID === 'undefined') {
-  window.SPREADSHEET_ID = '1AeTePW_XL1xAzgrLXHyxuCnXEenQkmMUHcfSiteyfsg';
+  window.SPREADSHEET_ID = '1WJYfJ1emctjLRk9dUnnItzwQ0E4EqM54u5_d3-4LLKU';
 }
 
 if (typeof DASHBOARD_SPREADSHEET_ID === 'undefined') {
-  window.DASHBOARD_SPREADSHEET_ID = '1AeTePW_XL1xAzgrLXHyxuCnXEenQkmMUHcfSiteyfsg';
+  window.DASHBOARD_SPREADSHEET_ID = '1_6yJxJ21ldI7aaKN5D38Qx0XTB-4bbyZS2iN6rP1LCI';
 }
 
 // Si no usas API key ni service account en GitHub Pages, define aqui los anios
