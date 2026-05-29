@@ -117,6 +117,15 @@ function actualizarUltimoMesControles() {
 function renderDashboard() {
   if (!AppState.dataActual) return;
   const data = AppState.dataActual;
+  // Si no hay filas (hoja vacía o año sin datos), mostrar aviso en lugar de gráficas vacías
+  if (!data.length) {
+    const el = document.getElementById('error-msg');
+    if (el) {
+      el.textContent = `No hay datos de recaudación para ${AppState.anioActual}. Selecciona otro año.`;
+      el.style.display = 'block';
+    }
+    return;
+  }
   const anio = AppState.anioActual;
 
   // KPI Cards
@@ -234,17 +243,20 @@ async function initApp() {
     cargarIpcDesdeBancoCentral().catch(() => {});
   }
 
-  // Seleccionar el año más reciente con datos (retrocede si el último está vacío)
+  // Seleccionar el año más reciente del selector.
+  // Solo se retrocede si el año lanza error (hoja inexistente / sin acceso);
+  // un año vacío (sin filas) es válido y se muestra igualmente.
   let inicialIdx = AppState.years.length - 1;
   for (let i = AppState.years.length - 1; i >= 0; i--) {
     const y = AppState.years[i];
     try {
-      const prueba = await loadWithCache(
+      await loadWithCache(
         y.sheet,
         () => loadPa01Data(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, y.sheet)
       );
-      if (prueba && prueba.length > 0) { inicialIdx = i; break; }
-    } catch { /* no disponible, probar año anterior */ }
+      inicialIdx = i; // la hoja existe (aunque esté vacía) → usar este año
+      break;
+    } catch { /* hoja inaccesible → probar año anterior */ }
   }
   const inicial = AppState.years[inicialIdx];
   sel.value = inicial.sheet;
