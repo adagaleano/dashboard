@@ -234,10 +234,21 @@ async function initApp() {
     cargarIpcDesdeBancoCentral().catch(() => {});
   }
 
-  // Seleccionar el año más reciente
-  const ultimo = AppState.years[AppState.years.length - 1];
-  sel.value = ultimo.sheet;
-  await cargarAnio(ultimo.sheet, ultimo.year);
+  // Seleccionar el año más reciente con datos (retrocede si el último está vacío)
+  let inicialIdx = AppState.years.length - 1;
+  for (let i = AppState.years.length - 1; i >= 0; i--) {
+    const y = AppState.years[i];
+    try {
+      const prueba = await loadWithCache(
+        y.sheet,
+        () => loadPa01Data(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, y.sheet)
+      );
+      if (prueba && prueba.length > 0) { inicialIdx = i; break; }
+    } catch { /* no disponible, probar año anterior */ }
+  }
+  const inicial = AppState.years[inicialIdx];
+  sel.value = inicial.sheet;
+  await cargarAnio(inicial.sheet, inicial.year);
 }
 
 // ── Event listeners (se enganchan desde el HTML) ─────────────────────────────

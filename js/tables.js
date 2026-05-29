@@ -15,6 +15,15 @@ function renderTablaImpuestos(data, containerId, anio) {
   const { meses, rows } = buildTablaImpuestos(data);
   destroyDT('dt-impuestos');
 
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Sin datos: mostrar mensaje en lugar de una tabla malformada
+  if (!meses.length) {
+    container.innerHTML = `<p style="color:#888;padding:10px;">Sin datos de recaudación para ${anio || 'este año'}.</p>`;
+    return;
+  }
+
   // Construir HTML de la tabla
   const tituloStr = anio ? `📊 Recaudación ${anio} — Millones de Lempiras` : '📊 Recaudación — Millones de Lempiras';
 
@@ -44,7 +53,6 @@ function renderTablaImpuestos(data, containerId, anio) {
   });
   tbody += '</tbody>';
 
-  const container = document.getElementById(containerId);
   container.innerHTML = `
     <h3 style="text-align:center;font-weight:700;color:#19488C;margin-bottom:10px">${tituloStr}</h3>
     <div class="table-scroll">
