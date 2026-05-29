@@ -128,18 +128,23 @@ function renderDashboard() {
   setCard('kpi-total-recaudado',     fmt(cumpl.observado),    'Total Recaudado (Mill. Lempiras)',       '✅');
   setCard('kpi-total-meta',          fmt(cumpl.meta),         'Total Meta (Mill. Lempiras)',            '🎯');
 
-  // Gráficos
-  renderHistograma(data, 'chart-histograma');
-  renderGraficoPastel(data, 'chart-pastel');
-  renderVelocimetro(data, 'chart-velocimetro');
+  const pasos = [
+    ['Histograma',   () => renderHistograma(data, 'chart-histograma')],
+    ['Pastel',       () => renderGraficoPastel(data, 'chart-pastel')],
+    ['Velocímetro',  () => renderVelocimetro(data, 'chart-velocimetro')],
+    ['TablaImpuestos', () => renderTablaImpuestos(data, 'container-tabla-impuestos', anio)],
+    ['TablaAcumulado', () => renderTablaAcumulado(data, 'container-tabla-acumulado')],
+    ['TablaVariaciones', () => renderTablaVariaciones(data, AppState.dataPrev, anio, AppState.modo, AppState.mesCorte, AppState.mesMensual, 'container-tabla-variaciones')],
+    ['Controles',    () => actualizarVisibilidadControles()]
+  ];
 
-  // Tablas
-  renderTablaImpuestos(data, 'container-tabla-impuestos', anio);
-  renderTablaAcumulado(data, 'container-tabla-acumulado');
-  renderTablaVariaciones(data, AppState.dataPrev, anio, AppState.modo, AppState.mesCorte, AppState.mesMensual, 'container-tabla-variaciones');
-
-  // Visibilidad de controles de modo
-  actualizarVisibilidadControles();
+  for (const [nombre, fn] of pasos) {
+    try { fn(); }
+    catch (e) {
+      console.error(`[renderDashboard] Error en ${nombre}:`, e);
+      throw new Error(`Fallo en ${nombre}: ${e.message}`);
+    }
+  }
 }
 
 function setCard(id, valor, label, icon) {
@@ -152,9 +157,11 @@ function setCard(id, valor, label, icon) {
 }
 
 function actualizarVisibilidadControles() {
-  const modo = AppState.modo;
-  document.getElementById('control-mes-corte')  .style.display = modo === 'acumulado' ? 'block' : 'none';
-  document.getElementById('control-mes-mensual') .style.display = modo === 'mensual'   ? 'block' : 'none';
+  const modo    = AppState.modo;
+  const corteEl   = document.getElementById('control-mes-corte');
+  const mensualEl = document.getElementById('control-mes-mensual');
+  if (corteEl)   corteEl.style.display   = modo === 'acumulado' ? 'block' : 'none';
+  if (mensualEl) mensualEl.style.display = modo === 'mensual'   ? 'block' : 'none';
 }
 
 function renderPagina2() {
