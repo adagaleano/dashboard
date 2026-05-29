@@ -1,4 +1,5 @@
-const LOGIN_SESSION_KEY = 'dashboard_sar_logged_in';
+const LOGIN_SESSION_KEY   = 'dashboard_sar_logged_in';
+const LOGIN_SESSION_HORAS = 8; // sesión expira a las 8 horas de inactividad
 
 function getAppUsers() {
   const users = Array.isArray(window.APP_USERS) ? window.APP_USERS : [];
@@ -44,6 +45,18 @@ function unlockDashboard(onSuccess) {
   if (typeof onSuccess === 'function') onSuccess();
 }
 
+function sesionValida() {
+  const raw = localStorage.getItem(LOGIN_SESSION_KEY);
+  if (!raw) return false;
+  try {
+    const { loggedAt } = JSON.parse(raw);
+    const ms = LOGIN_SESSION_HORAS * 3600 * 1000;
+    return (Date.now() - new Date(loggedAt).getTime()) < ms;
+  } catch {
+    return false;
+  }
+}
+
 function handleAppLogin(onSuccess) {
   clearLoginError();
 
@@ -69,11 +82,19 @@ function handleAppLogin(onSuccess) {
 }
 
 function initLogin(onSuccess) {
-  const saved = localStorage.getItem(LOGIN_SESSION_KEY);
-  if (saved) {
+  if (sesionValida()) {
+    // Renovar timestamp para reiniciar el contador desde el último acceso
+    try {
+      const raw  = JSON.parse(localStorage.getItem(LOGIN_SESSION_KEY));
+      raw.loggedAt = new Date().toISOString();
+      localStorage.setItem(LOGIN_SESSION_KEY, JSON.stringify(raw));
+    } catch {}
     unlockDashboard(onSuccess);
     return;
   }
+
+  // Sesión expirada o inexistente — limpiar y mostrar formulario
+  localStorage.removeItem(LOGIN_SESSION_KEY);
 
   const form = document.getElementById('login-form');
   if (!form) {

@@ -12,7 +12,15 @@ const AppState = {
   currentTab:   'dashboard',
   modo:         'anual',
   mesCorte:     null,
-  mesMensual:   null
+  mesMensual:   null,
+  // Segmentación
+  depData:       null,
+  depPrev:       null,
+  segModo:       'recaudacion',
+  segMes:        null,
+  segRanking:    null,
+  segRankingPos: 1,
+  segTablaData:  null
 };
 
 // ── Navegación ────────────────────────────────────────────────────────────────
@@ -26,7 +34,8 @@ function switchTab(tab) {
   if (tabEl) tabEl.classList.add('active');
   if (btnEl) btnEl.classList.add('active');
 
-  if (tab === 'pagina2' && AppState.dataActual) renderPagina2();
+  if (tab === 'pagina2'      && AppState.dataActual) renderPagina2();
+  if (tab === 'segmentacion' && AppState.dataActual) renderSegmentacion();
 }
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
@@ -41,6 +50,13 @@ function hideLoading() {
 // ── Cargar datos del año seleccionado ─────────────────────────────────────────
 async function cargarAnio(sheetName, anio, fromRefresh = false) {
   showLoading(`Cargando datos ${anio}…`);
+
+  // Limpiar estado de segmentación al cambiar de año
+  AppState.depData       = null;
+  AppState.depPrev       = null;
+  AppState.segRanking    = null;
+  AppState.segRankingPos = 1;
+  AppState.segTablaData  = null;
 
   try {
     const cacheKey = fromRefresh ? null : sheetName;
@@ -199,6 +215,11 @@ async function initApp() {
     `<option value="${y.sheet}" data-year="${y.year}">${y.year}</option>`
   ).join('');
 
+  // Actualizar IPC en background sin bloquear la carga principal
+  if (typeof cargarIpcDesdeBancoCentral === 'function') {
+    cargarIpcDesdeBancoCentral().catch(() => {});
+  }
+
   // Seleccionar el año más reciente
   const ultimo = AppState.years[AppState.years.length - 1];
   sel.value = ultimo.sheet;
@@ -248,5 +269,151 @@ function onMesMensualChange() {
   }
 }
 
-// Lanzar al cargar la página
-window.addEventListener('DOMContentLoaded', initApp);
+// ── Segmentación: carga de datos por departamento ────────────────────────────
+async function cargarDepData() {
+  if (!AppState.anioActual) return;
+  const anio      = AppState.anioActual;
+  const sheetAct  = `Departamento_${anio}`;
+  const sheetPrev = `Departamento_${anio - 1}`;
+
+  try {
+    AppState.depData = await loadWithCache(
+      sheetAct,
+      () => loadDepData(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, sheetAct)
+    );
+  } catch (e) {
+    console.warn(`No se pudo cargar ${sheetAct}:`, e.message || e);
+    AppState.depData = null;
+  }
+
+  try {
+    AppState.depPrev = await loadWithCache(
+      sheetPrev,
+      () => loadDepData(AppState.accessToken, DASHBOARD_SPREADSHEET_ID, sheetPrev)
+    );
+  } catch {
+    AppState.depPrev = null;
+  }
+}
+
+// ── Poblar selector de mes para segmentación ──────────────────────────────────
+function poblarSelectorMesSeg() {
+  const sel = document.getElementById('sel-mes-seg');
+  if (!sel) return;
+
+  const meses = AppState.depData ? getMesesDisponibles(AppState.depData) : [];
+  sel.innerHTML = '<option value="">Todos los meses</option>'
+    + meses.map(m => {
+        const nombre = MESES_ORDENADOS[m - 1] || `Mes ${m}`;
+        return `<option value="${m}">${nombre}</option>`;
+      }).join('');
+
+  if (meses.length) {
+    const ultimo = meses[meses.length - 1];
+    sel.value       = String(ultimo);
+    AppState.segMes = ultimo;
+  } else {
+    AppState.segMes = null;
+  }
+}
+
+// ── Render segmentación completa ─────────────────────────────────────────────
+async function renderSegmentacion() {
+  if (!AppState.dataActual) return;
+
+  // Cargar datos de departamento si aún no están disponibles
+  if (!AppState.depData) {
+    showLoading('Cargando datos por departamento…');
+    try { await cargarDepData(); }
+    finally { hideLoading(); }
+  }
+
+  if (!AppState.depData) {
+    const el = document.getElementById('ranking-cards');
+    if (el) el.innerHTML = '<p style="color:#888;padding:10px;">No hay datos de departamento disponibles.</p>';
+    return;
+  }
+
+  // Poblar selector de mes si aún está vacío
+  const sel = document.getElementById('sel-mes-seg');
+  if (sel && sel.options.length <= 1) poblarSelectorMesSeg();
+
+  const anio   = AppState.anioActual;
+  const anioP  = anio ? anio - 1 : null;
+  const mesNum = AppState.segMes ? Number(AppState.segMes) : null;
+  const mode   = AppState.segModo || 'recaudacion';
+  const mesLbl = mesNum ? (MESES_ORDENADOS[mesNum - 1] || `Mes ${mesNum}`) : 'Acumulado';
+
+  // Ajustar montos departamentales al total PA01 por mes
+  const adjActual = ajustarPorPa01(AppState.depData, AppState.dataActual);
+  const adjPrev   = ajustarPorPa01(AppState.depPrev, AppState.dataPrev);
+  const col       = getColDep(adjActual);
+  if (!col) return;
+
+  // Agregación interanual (mapa + ranking)
+  const agg = agregarInteranual(adjActual, adjPrev, col, mesNum, anio, anioP);
+
+  // Ranking menor → mayor (como en Shiny)
+  AppState.segRanking    = [...agg].sort((a, b) => (a.valor || 0) - (b.valor || 0));
+  AppState.segRankingPos = AppState.segRankingPos || 1;
+
+  // Datos de tabla para exportar
+  AppState.segTablaData = buildTablaSegmentacion(adjActual, adjPrev, anio, mesNum);
+
+  // Actualizar títulos
+  const modeLabel = { recaudacion: 'Recaudación', variacion: 'Var. nominal', var_real: 'Var. real' }[mode] || mode;
+  const mapTitleEl  = document.getElementById('seg-map-title');
+  const rankTitleEl = document.getElementById('seg-ranking-title');
+  if (mapTitleEl)  mapTitleEl.textContent  = `Mapa por Departamento — ${modeLabel} ${mesLbl} ${anio || ''}`;
+  if (rankTitleEl) rankTitleEl.textContent = `Ranking Departamentos — Recaudación ${mesLbl} ${anio || ''}`;
+
+  // Inicializar mapa Leaflet si aún no existe (requiere que el contenedor sea visible)
+  if (!_mapaInstance) crearMapaBase('mapa-departamentos');
+
+  // Asegurar que el GeoJSON esté cargado antes de renderizar el mapa
+  if (!_hnGeojson) {
+    try { await cargarGeojson('hn_departamentos.geojson'); } catch (e) {}
+  }
+
+  await renderMapaSegmentacion(agg, mode, mesLbl, anio, anioP);
+  renderRankingDep(AppState.segRanking, 'ranking-cards', AppState.segRankingPos);
+  renderTablaSegmentacion(AppState.segTablaData, 'container-tabla-seg', anio);
+}
+
+// ── Event handlers de segmentación ───────────────────────────────────────────
+function onMesSegChange() {
+  const val = document.getElementById('sel-mes-seg')?.value;
+  AppState.segMes        = val ? Number(val) : null;
+  AppState.segRankingPos = 1;
+  renderSegmentacion();
+}
+
+function onModeSegChange(mode) {
+  AppState.segModo = mode;
+  ['recaudacion', 'variacion', 'var_real'].forEach(m => {
+    const btn = document.getElementById(`btn-seg-${m}`);
+    if (btn) btn.classList.toggle('viz-btn-active', m === mode);
+  });
+  renderSegmentacion();
+}
+
+function onRankingPrev() {
+  AppState.segRankingPos = Math.max(1, (AppState.segRankingPos || 1) - 5);
+  if (AppState.segRanking) {
+    renderRankingDep(AppState.segRanking, 'ranking-cards', AppState.segRankingPos);
+  }
+}
+
+function onRankingNext() {
+  const n      = AppState.segRanking ? AppState.segRanking.length : 0;
+  const newPos = (AppState.segRankingPos || 1) + 5;
+  if (newPos <= n) {
+    AppState.segRankingPos = newPos;
+    renderRankingDep(AppState.segRanking, 'ranking-cards', AppState.segRankingPos);
+  }
+}
+
+// Lanzar al cargar la página — primero el login, luego la carga de datos
+window.addEventListener('DOMContentLoaded', () => {
+  initLogin(initApp);
+});
