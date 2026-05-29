@@ -47,8 +47,44 @@ async function fetchPublicSheet(spreadsheetId, sheetName) {
   return parseGvizRows(await res.text());
 }
 
+// Sheets API v4 sin autenticación: funciona para hojas OCULTAS en spreadsheets públicos
+// (el endpoint gviz solo accede a hojas visibles)
+async function fetchSheetV4Unauth(spreadsheetId, sheetName) {
+  const rango = `${sheetName}!A1:Z5000`;
+  const url   = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(rango)}`;
+  const res   = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `HTTP ${res.status}`);
+  }
+  const result  = await res.json();
+  if (result.error) throw new Error(result.error.message || 'Sheets API error');
+  const valores = result.values || [];
+  if (!valores.length) return [];
+  const headers = valores[0];
+  const filas   = valores.slice(1);
+  const nCols   = headers.length;
+  return filas
+    .map(row => {
+      const padded = row.length < nCols ? [...row, ...Array(nCols - row.length).fill('')] : row.slice(0, nCols);
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = padded[i] ?? ''; });
+      return obj;
+    })
+    .filter(row => Object.values(row).some(v => String(v).trim() !== ''));
+}
+
 async function fetchSheet(accessToken, spreadsheetId, sheetName) {
   if (!canUseSheetsApi(accessToken)) {
+    // Primero: Sheets API v4 sin auth — accede a hojas ocultas en spreadsheets públicos
+    // (equivalente a gs4_deauth() en R, que bypasea el límite del endpoint gviz)
+    try {
+      const rows = await fetchSheetV4Unauth(spreadsheetId, sheetName);
+      return rows;
+    } catch (e) {
+      console.log(`[fetchSheet] v4 sin auth falló para "${sheetName}": ${e.message} — usando gviz`);
+    }
+    // Fallback: gviz (solo funciona para hojas visibles)
     return fetchPublicSheet(spreadsheetId, sheetName);
   }
 

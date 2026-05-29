@@ -382,12 +382,47 @@ async function renderSegmentacion() {
   }
 
   if (!AppState.depData) {
-    const intentados = DEP_SHEET_PATTERNS
-      .map(p => p(AppState.anioActual)).join(', ');
-    const msg = `No se encontraron datos de departamento. Hojas buscadas: ${intentados}`;
+    const intentados = DEP_SHEET_PATTERNS.map(p => p(AppState.anioActual)).join(', ');
+    console.warn('[Seg] Hojas buscadas:', intentados);
+
+    // Determinar si es probable que las hojas existan pero estén ocultas
+    // (cuando la app R funciona pero el dashboard web no, la causa casi siempre
+    //  es que las hojas Departamento_YYYY están ocultas en Google Sheets —
+    //  el endpoint gviz no accede a hojas ocultas; la API v4 sí)
+    const hayApiKey = typeof GOOGLE_API_KEY !== 'undefined' && GOOGLE_API_KEY;
+    const hayServiceAccount = typeof SERVICE_ACCOUNT_KEY !== 'undefined';
+
     const el = document.getElementById('ranking-cards');
-    if (el) el.innerHTML = `<p style="color:#b71c1c;padding:10px;">${msg}</p>`;
-    console.warn('[Seg]', msg);
+    if (el) {
+      el.innerHTML = `
+        <div style="background:#fff8e1;border-left:4px solid #ffa000;border-radius:6px;
+                    padding:16px 18px;max-width:620px;margin:10px 0;font-size:13px;line-height:1.6;">
+          <p style="margin:0 0 10px;font-weight:700;color:#e65100;font-size:14px;">
+            ⚠️ Datos de segmentación no disponibles en línea
+          </p>
+          <p style="margin:0 0 8px;color:#5d4037;">
+            Las hojas <strong>Departamento_${AppState.anioActual}</strong> muy probablemente están
+            <strong>ocultas</strong> en Google Sheets. La app de escritorio (R) puede acceder a ellas
+            porque usa la Sheets API v4 con autenticación; el dashboard web cae en el endpoint
+            <em>gviz</em> que <strong>no lee hojas ocultas</strong>.
+          </p>
+          <p style="margin:0 0 6px;font-weight:600;color:#4e342e;">Solución más simple:</p>
+          <ol style="margin:0 0 10px;padding-left:20px;color:#5d4037;">
+            <li>Abre el spreadsheet en Google Sheets.</li>
+            <li>Haz clic derecho en la pestaña <strong>Departamento_${AppState.anioActual}</strong>
+                (si aparece en la lista de hojas ocultas).</li>
+            <li>Elige <em>Mostrar hoja</em> y repite para todos los años.</li>
+            <li>Recarga el dashboard (<strong>Actualizar datos</strong>).</li>
+          </ol>
+          <p style="margin:0 0 6px;font-weight:600;color:#4e342e;">Alternativa (sin cambiar el spreadsheet):</p>
+          <p style="margin:0;color:#5d4037;">
+            Añade una Google Sheets API Key en <code>config.public.js</code>:<br>
+            <code style="background:#f5f5f5;padding:2px 6px;border-radius:3px;">
+              window.GOOGLE_API_KEY = 'AIza...tu-clave...';
+            </code>
+          </p>
+        </div>`;
+    }
     return;
   }
 

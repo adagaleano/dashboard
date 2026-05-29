@@ -14,7 +14,17 @@ if (typeof DASHBOARD_PUBLIC_YEARS === 'undefined') {
   window.DASHBOARD_PUBLIC_YEARS = [2023, 2024, 2025, 2026];
 }
 
-// Reemplaza este valor por tu API key publica restringida a tu dominio de GitHub Pages.
+// API key pública de Google Sheets (opcional pero NECESARIA para leer hojas ocultas).
+// Sin esta clave, el dashboard usa el endpoint gviz que no accede a hojas ocultas,
+// lo que hace que la pestaña "Segmentación" no muestre datos.
+//
+// Cómo obtener una API key gratuita:
+//   1. Ve a https://console.cloud.google.com/
+//   2. Crea un proyecto (o usa uno existente)
+//   3. Habilita "Google Sheets API"
+//   4. En "Credenciales" crea una API Key
+//   5. Restringe la clave a: Sitios web HTTP → tu dominio de GitHub Pages (ej. https://usuario.github.io/*)
+//   6. Pega la clave abajo reemplazando el string vacío
 if (typeof GOOGLE_API_KEY === 'undefined') {
-  window.GOOGLE_API_KEY = '';
+  window.GOOGLE_API_KEY = '';  // ← pega aquí tu API key, ej: 'AIzaSy...'
 }
