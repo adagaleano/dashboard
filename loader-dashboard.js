@@ -44,7 +44,14 @@ async function fetchPublicSheet(spreadsheetId, sheetName) {
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Error leyendo hoja publica "${sheetName}": ${res.statusText}`);
-  return parseGvizRows(await res.text());
+  const text = await res.text();
+  // Diagnóstico: si no empieza con el prefijo gviz esperado, la hoja no es pública
+  if (!text.includes('google.visualization') && !text.includes('"table"')) {
+    console.warn(`[gviz] Respuesta inesperada para "${sheetName}" — ¿el spreadsheet requiere login?`,
+      text.substring(0, 200));
+    throw new Error(`Hoja "${sheetName}" no accesible: respuesta no es gviz (¿spreadsheet privado?)`);
+  }
+  return parseGvizRows(text);
 }
 
 // Sheets API v4 sin autenticación: funciona para hojas OCULTAS en spreadsheets públicos
