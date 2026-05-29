@@ -11,7 +11,7 @@ if (typeof DASHBOARD_SPREADSHEET_ID === 'undefined') {
 // Si no usas API key ni service account en GitHub Pages, define aqui los anios
 // disponibles para que la app sepa que hojas pa01_YYYY intentar cargar.
 if (typeof DASHBOARD_PUBLIC_YEARS === 'undefined') {
-  window.DASHBOARD_PUBLIC_YEARS = [2023, 2024, 2025, 2026];
+  window.DASHBOARD_PUBLIC_YEARS = [2022, 2023, 2024, 2025, 2026];
 }
 
 // API key pública de Google Sheets (opcional pero NECESARIA para leer hojas ocultas).
