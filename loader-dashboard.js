@@ -154,13 +154,25 @@ async function loadPa01Data(accessToken, spreadsheetId, sheetName) {
   const filas = await fetchSheet(accessToken, spreadsheetId, sheetName);
 
   return filas.map(row => {
-    // Normalizar monto: manejar "1,234.56" y "1.234,56"
-    const montoStr = String(row.monto ?? '');
-    let monto;
-    if (montoStr.includes(',') && montoStr.includes('.')) {
-      monto = parseFloat(montoStr.replace(/,/g, ''));
-    } else {
-      monto = parseFloat(montoStr.replace(',', '.'));
+    const montoRaw = row.monto;
+    const montoStr = String(montoRaw ?? '').trim();
+
+    let monto = null;
+
+    if (montoStr !== '') {
+      let limpio = montoStr;
+
+      // Manejar formato tipo 1,234.56
+      if (limpio.includes(',') && limpio.includes('.')) {
+        limpio = limpio.replace(/,/g, '');
+      } 
+      // Manejar formato tipo 1234,56
+      else {
+        limpio = limpio.replace(',', '.');
+      }
+
+      const parsed = parseFloat(limpio);
+      monto = isNaN(parsed) ? null : parsed;
     }
 
     return {
@@ -169,9 +181,14 @@ async function loadPa01Data(accessToken, spreadsheetId, sheetName) {
       concepto_imp: String(row.concepto_imp ?? '').trim(),
       concepto_cat: String(row.concepto_cat ?? '').trim(),
       categoria:    String(row.categoria    ?? '').trim(),
-      monto:        isNaN(monto) ? 0 : monto
+      monto:        monto
     };
-  }).filter(r => r.mes && r.concepto_cat && r.categoria);
+  }).filter(r =>
+    r.mes &&
+    r.concepto_cat &&
+    r.categoria &&
+    r.monto !== null
+  );
 }
 
 // Cache en memoria (equivalente al cache en disco de R)
