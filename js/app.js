@@ -328,12 +328,25 @@ async function cargarDepData() {
   if (!AppState.anioActual) return;
   const anio = AppState.anioActual;
 
-  const { data: act, sheetName: sAct } = await tryLoadDepSheet(anio);
-  AppState.depData      = act;
-  AppState.depSheetName = sAct;
+  // Buscar hoja del año actual hacia atrás (igual que el R app con anio_max)
+  let depAnio = null;
+  for (let y = anio; y >= anio - 3 && !depAnio; y--) {
+    const { data, sheetName } = await tryLoadDepSheet(y);
+    if (data && data.length > 0) {
+      AppState.depData      = data;
+      AppState.depSheetName = sheetName;
+      depAnio = y;
+    }
+  }
 
-  const { data: prev } = await tryLoadDepSheet(anio - 1);
-  AppState.depPrev = prev;
+  if (!depAnio) {
+    AppState.depData      = null;
+    AppState.depSheetName = null;
+  }
+
+  // Hoja del año anterior al que encontramos con datos
+  const { data: prev } = await tryLoadDepSheet((depAnio || anio) - 1);
+  AppState.depPrev = prev || null;
 }
 
 // ── Poblar selector de mes para segmentación ──────────────────────────────────
